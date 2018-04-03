@@ -1,0 +1,65 @@
+#Informe o diretório 
+setwd("/home/user")
+
+
+library("ggplot2") 
+
+#Função para calcular a média e intervalo de confiança
+
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+    library(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        c(N    = length2(xx[[col]], na.rm=na.rm),
+          mean = mean   (xx[[col]], na.rm=na.rm),
+          sd   = sd     (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+
+    return(datac)
+}
+
+
+
+file_name <- "nome_arquivo.csv"
+
+# Repassa o arquivo para a variável A, informando o seu separador padrão ","
+
+a <- read.csv(file_name, header=TRUE, sep=",")
+
+a <- summarySE(a, measurevar="<coluna_para_calcular_média>", groupvars=c("<Tipo_agrupamento1>", "<Tipo_agrupamento2>"))
+
+#Salvar o gráfico gerado como imagem
+png(paste0(file_name, ".png"))
+
+
+#Plotar o gráfico
+
+ggplot(a, aes(x=<valor_x>, y=<valor_y>, fill=<legenda>)) + ylim(0, 25) +  geom_bar(stat="identity", position=position_dodge(),colour="black",size=.3) + theme_bw() + scale_fill_grey() + labs(x="Texto que será mostrado em x", y= "Texto que será mostrado em Y", fill = "Texto que será mostrado na legenda") + theme(legend.text=element_text(size=15),axis.text=element_text(size=20),
+        axis.title=element_text(size=20)) + geom_errorbar(aes(ymin=<coluna_da_média_calculada>-ci, ymax=<coluna_da_média_calculada>+ci), width=.2, size=.3, position=position_dodge(.9))
+
+dev.off()
+
